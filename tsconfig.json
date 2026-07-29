@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "jsx": "react-jsx",
     "declaration": true,
     "outDir": "./dist",
@@ -11,23 +11,7 @@
     "noImplicitAny": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
-    "paths": {
-      "@medusajs/framework/http": ["../backend/node_modules/@medusajs/framework/dist/http"],
-      "@medusajs/framework/utils": ["../backend/node_modules/@medusajs/framework/dist/utils"],
-      "@medusajs/framework/workflows-sdk": ["../backend/node_modules/@medusajs/framework/dist/workflows-sdk"],
-      "@medusajs/framework/*": ["../backend/node_modules/@medusajs/framework/dist/*"],
-      "@medusajs/framework": ["../backend/node_modules/@medusajs/framework/dist"],
-      "@medusajs/medusa/core-flows": ["../backend/node_modules/@medusajs/medusa/dist/core-flows"],
-      "@medusajs/medusa/*": ["../backend/node_modules/@medusajs/medusa/dist/*"],
-      "@medusajs/medusa": ["../backend/node_modules/@medusajs/medusa/dist"],
-      "@medusajs/admin-sdk": ["../backend/node_modules/@medusajs/admin-sdk/dist"],
-      "@medusajs/ui": ["../backend/node_modules/@medusajs/ui/dist"],
-      "@medusajs/icons": ["../backend/node_modules/@medusajs/icons/dist"],
-      "zod": ["../backend/node_modules/zod"],
-      "react": ["../backend/node_modules/@types/react"]
-    }
+    "forceConsistentCasingInFileNames": true
   },
   "include": ["src/**/*"]
 }
