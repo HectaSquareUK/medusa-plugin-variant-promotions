@@ -20,7 +20,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
   try {
     const { result } = await createVariantPromotionWorkflow(req.scope).run({
-      input,
+      input: input as any,
     })
     const promo = Array.isArray(result)
       ? result[0]
