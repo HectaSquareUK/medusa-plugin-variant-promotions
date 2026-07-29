@@ -82,7 +82,7 @@ export default async function autoVariantPromotionsHandler({
       input: {
         cart_id: cartId,
         promo_codes: matchingPromoCodes,
-        action: "add",
+        action: "ADD" as any,
       },
     })
   } catch (error) {

@@ -65,7 +65,7 @@ export const createVariantPromotionWorkflow = createWorkflow(
     }
 
     const createdPromotions = createPromotionsWorkflow.runAsStep({
-      input: [promotionData],
+      input: [promotionData] as any,
     })
 
     return new WorkflowResponse(createdPromotions[0])

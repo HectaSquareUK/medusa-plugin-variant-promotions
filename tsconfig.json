@@ -26,5 +26,5 @@
       "react/jsx-runtime": ["../backend/node_modules/@types/react/jsx-runtime"]
     }
   },
-  "include": ["src/**/*", "admin/**/*"]
+  "include": ["src/**/*", "admin/**/*", "api/**/*", "subscribers/**/*", "workflows/**/*", "validators.ts"]
 }
