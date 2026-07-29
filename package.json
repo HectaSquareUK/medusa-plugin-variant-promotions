@@ -1,23 +1,25 @@
 {
   "name": "@hectasquare/medusa-plugin-variant-promotions",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Medusa v2 plugin adding full support for variant-level promotions with native search, automatic subscriber, and Admin UI creation wizard.",
-  "main": "dist/index.js",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": ".medusa/server/index.js",
+  "module": ".medusa/server/index.js",
+  "types": ".medusa/server/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "default": "./dist/index.js"
+      "types": "./.medusa/server/index.d.ts",
+      "import": "./.medusa/server/index.js",
+      "require": "./.medusa/server/index.js",
+      "default": "./.medusa/server/index.js"
     },
     "./package.json": "./package.json",
-    "./admin": "./admin/index.js",
-    "./admin/*": "./admin/*",
-    "./api/*": "./api/*",
-    "./subscribers/*": "./subscribers/*",
-    "./workflows/*": "./workflows/*",
+    "./admin": {
+      "import": "./.medusa/server/src/admin/index.mjs",
+      "require": "./.medusa/server/src/admin/index.js",
+      "default": "./.medusa/server/src/admin/index.js"
+    },
+    "./.medusa/server/src/*": "./.medusa/server/src/*",
+    "./.medusa/server/*": "./.medusa/server/*",
     "./*": "./*"
   },
   "keywords": [
@@ -31,6 +33,7 @@
   "author": "Monfil Store",
   "license": "MIT",
   "files": [
+    ".medusa/server",
     "admin",
     "api",
     "subscribers",
@@ -49,6 +52,7 @@
   },
   "devDependencies": {
     "@medusajs/admin-sdk": "^2.12.4",
+    "@medusajs/admin-shared": "^2.12.4",
     "@medusajs/framework": "^2.12.4",
     "@medusajs/icons": "^2.12.4",
     "@medusajs/medusa": "^2.12.4",

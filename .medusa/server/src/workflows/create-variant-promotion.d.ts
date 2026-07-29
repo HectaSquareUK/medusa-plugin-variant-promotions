@@ -1,0 +1,24 @@
+export type CreateVariantPromotionWorkflowInput = {
+    code: string;
+    description?: string;
+    type?: "percentage_off_product" | "buy_x_get_y";
+    currency_code?: string;
+    discount_kind?: "percentage" | "fixed";
+    value: number;
+    allocation?: "each" | "across" | "once";
+    max_quantity?: number;
+    status?: "active" | "draft";
+    is_automatic?: boolean;
+    is_tax_inclusive?: boolean;
+    usage_limit?: number;
+    variant_ids: string[];
+    customer_group_ids?: string[];
+    region_ids?: string[];
+    starts_at?: Date | string;
+    ends_at?: Date | string;
+    buy_variant_ids?: string[];
+    buy_min_quantity?: number;
+    campaign_id?: string;
+};
+export declare const buildPromotionPayloadStep: import("@medusajs/framework/workflows-sdk").StepFunction<CreateVariantPromotionWorkflowInput, Record<string, unknown>>;
+export declare const createVariantPromotionWorkflow: import("@medusajs/framework/workflows-sdk").ReturnWorkflow<CreateVariantPromotionWorkflowInput, import("@medusajs/types").PromotionDTO[], []>;

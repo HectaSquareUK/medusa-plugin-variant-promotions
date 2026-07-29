@@ -1,0 +1,51 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.config = void 0;
+exports.PromotionVariantDetailWidget = PromotionVariantDetailWidget;
+const jsx_runtime_1 = require("react/jsx-runtime");
+const admin_sdk_1 = require("@medusajs/admin-sdk");
+const react_query_1 = require("@tanstack/react-query");
+const ui_1 = require("@medusajs/ui");
+const RESOLVED_VARIANT_ATTRIBUTE = "items.variant.id";
+function PromotionVariantDetailWidget({ data: promotion, }) {
+    const targetRule = (promotion?.application_method?.target_rules ?? []).find((r) => r.attribute === RESOLVED_VARIANT_ATTRIBUTE);
+    const buyRule = (promotion?.application_method?.buy_rules ?? []).find((r) => r.attribute === RESOLVED_VARIANT_ATTRIBUTE);
+    const activeRule = targetRule ?? buyRule;
+    const ids = (activeRule?.values ?? []).map((v) => v.value);
+    const { data: variants, isLoading } = (0, react_query_1.useQuery)({
+        queryKey: ["promotion-variant-detail", ids.join(",")],
+        queryFn: async () => {
+            if (ids.length === 0)
+                return [];
+            const params = new URLSearchParams();
+            ids.forEach((id) => params.append("id[]", id));
+            params.set("fields", "id,title,sku,product_id,product.id,product.title,product.thumbnail");
+            const res = await fetch(`/admin/product-variants?${params.toString()}`, {
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+            });
+            if (!res.ok)
+                return [];
+            const json = await res.json();
+            return (json.variants ?? []);
+        },
+        enabled: ids.length > 0,
+    });
+    if (!activeRule || ids.length === 0) {
+        return null;
+    }
+    const variantById = new Map((variants ?? []).map((v) => [v.id, v]));
+    return ((0, jsx_runtime_1.jsxs)(ui_1.Container, { className: "p-0 divide-y", children: [(0, jsx_runtime_1.jsxs)("div", { className: "px-6 py-4 flex items-center justify-between", children: [(0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsxs)(ui_1.Heading, { level: "h2", className: "text-base font-semibold", children: ["Targeted Variants (", ids.length, ")"] }), (0, jsx_runtime_1.jsx)(ui_1.Text, { size: "small", className: "text-ui-fg-subtle", children: "This promotion is scoped to specific product variants." })] }), (0, jsx_runtime_1.jsx)(ui_1.Badge, { color: "blue", size: "small", children: targetRule ? "Targeted Items" : "Trigger Items" })] }), (0, jsx_runtime_1.jsx)("div", { className: "px-6 py-4", children: (0, jsx_runtime_1.jsxs)(ui_1.Table, { children: [(0, jsx_runtime_1.jsx)(ui_1.Table.Header, { children: (0, jsx_runtime_1.jsxs)(ui_1.Table.Row, { children: [(0, jsx_runtime_1.jsx)(ui_1.Table.HeaderCell, { children: "Product" }), (0, jsx_runtime_1.jsx)(ui_1.Table.HeaderCell, { children: "Variant Title" }), (0, jsx_runtime_1.jsx)(ui_1.Table.HeaderCell, { children: "SKU" })] }) }), (0, jsx_runtime_1.jsxs)(ui_1.Table.Body, { children: [isLoading && ((0, jsx_runtime_1.jsx)(ui_1.Table.Row, { children: (0, jsx_runtime_1.jsx)(ui_1.Table.Cell, { ...{ colSpan: 3 }, children: (0, jsx_runtime_1.jsx)(ui_1.Text, { size: "small", className: "text-ui-fg-subtle py-2 block text-center", children: "Loading variants\u2026" }) }) })), !isLoading &&
+                                    ids.map((id) => {
+                                        const v = (variantById.get(id) ?? {});
+                                        const productId = v?.product?.id ?? v?.product_id;
+                                        const productTitle = v?.product?.title ?? "Product";
+                                        const thumbnail = v?.product?.thumbnail;
+                                        return ((0, jsx_runtime_1.jsxs)(ui_1.Table.Row, { children: [(0, jsx_runtime_1.jsx)(ui_1.Table.Cell, { children: productId ? ((0, jsx_runtime_1.jsxs)("a", { href: `/app/products/${productId}`, className: "flex items-center gap-x-2 text-ui-fg-interactive hover:underline font-medium text-sm", children: [thumbnail && ((0, jsx_runtime_1.jsx)("img", { src: thumbnail, alt: "", className: "w-6 h-6 rounded object-cover border" })), (0, jsx_runtime_1.jsx)("span", { children: productTitle })] })) : ((0, jsx_runtime_1.jsx)(ui_1.Text, { size: "small", className: "text-ui-fg-subtle", children: id })) }), (0, jsx_runtime_1.jsx)(ui_1.Table.Cell, { children: productId ? ((0, jsx_runtime_1.jsx)("a", { href: `/app/products/${productId}/variants/${id}`, className: "text-ui-fg-interactive hover:underline font-medium text-sm", children: v?.title ?? "—" })) : ((0, jsx_runtime_1.jsx)(ui_1.Text, { size: "small", children: v?.title ?? "—" })) }), (0, jsx_runtime_1.jsx)(ui_1.Table.Cell, { children: (0, jsx_runtime_1.jsx)(ui_1.Text, { size: "small", className: "font-mono text-ui-fg-subtle", children: v?.sku ?? "—" }) })] }, id));
+                                    })] })] }) })] }));
+}
+exports.config = (0, admin_sdk_1.defineWidgetConfig)({
+    zone: "promotion.details.after",
+});
+exports.default = PromotionVariantDetailWidget;
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoicHJvbW90aW9uLXZhcmlhbnQtZGV0YWlsLmpzIiwic291cmNlUm9vdCI6IiIsInNvdXJjZXMiOlsiLi4vLi4vLi4vLi4vYWRtaW4vd2lkZ2V0cy9wcm9tb3Rpb24tdmFyaWFudC1kZXRhaWwudHN4Il0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiI7OztBQW1CQSxvRUFxSUM7O0FBeEpELG1EQUF3RDtBQUV4RCx1REFBZ0Q7QUFDaEQscUNBQXFFO0FBRXJFLE1BQU0sMEJBQTBCLEdBQUcsa0JBQWtCLENBQUE7QUFjckQsU0FBZ0IsNEJBQTRCLENBQUMsRUFDM0MsSUFBSSxFQUFFLFNBQVMsR0FDbUI7SUFDbEMsTUFBTSxVQUFVLEdBQUcsQ0FBQyxTQUFTLEVBQUUsa0JBQWtCLEVBQUUsWUFBWSxJQUFJLEVBQUUsQ0FBQyxDQUFDLElBQUksQ0FDekUsQ0FBQyxDQUFNLEVBQUUsRUFBRSxDQUFDLENBQUMsQ0FBQyxTQUFTLEtBQUssMEJBQTBCLENBQ3ZELENBQUE7SUFDRCxNQUFNLE9BQU8sR0FBRyxDQUFDLFNBQVMsRUFBRSxrQkFBa0IsRUFBRSxTQUFTLElBQUksRUFBRSxDQUFDLENBQUMsSUFBSSxDQUNuRSxDQUFDLENBQU0sRUFBRSxFQUFFLENBQUMsQ0FBQyxDQUFDLFNBQVMsS0FBSywwQkFBMEIsQ0FDdkQsQ0FBQTtJQUVELE1BQU0sVUFBVSxHQUFHLFVBQVUsSUFBSSxPQUFPLENBQUE7SUFDeEMsTUFBTSxHQUFHLEdBQWEsQ0FBQyxVQUFVLEVBQUUsTUFBTSxJQUFJLEVBQUUsQ0FBQyxDQUFDLEdBQUcsQ0FBQyxDQUFDLENBQU0sRUFBRSxFQUFFLENBQUMsQ0FBQyxDQUFDLEtBQUssQ0FBQyxDQUFBO0lBRXpFLE1BQU0sRUFBRSxJQUFJLEVBQUUsUUFBUSxFQUFFLFNBQVMsRUFBRSxHQUFHLElBQUEsc0JBQVEsRUFBQztRQUM3QyxRQUFRLEVBQUUsQ0FBQywwQkFBMEIsRUFBRSxHQUFHLENBQUMsSUFBSSxDQUFDLEdBQUcsQ0FBQyxDQUFDO1FBQ3JELE9BQU8s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
