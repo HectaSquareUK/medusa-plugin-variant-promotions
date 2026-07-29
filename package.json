@@ -1,9 +1,22 @@
 {
-  "name": "medusa-plugin-variant-promotions",
-  "version": "1.0.0",
+  "name": "@hectasquare/medusa-plugin-variant-promotions",
+  "version": "1.0.3",
   "description": "Medusa v2 plugin adding full support for variant-level promotions with native search, automatic subscriber, and Admin UI creation wizard.",
   "main": "dist/index.js",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./admin": {
+      "default": "./dist/admin/index.js"
+    }
+  },
   "keywords": [
     "medusa",
     "medusa-plugin",
