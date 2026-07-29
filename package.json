@@ -2,7 +2,7 @@
   "name": "medusa-plugin-variant-promotions",
   "version": "1.0.0",
   "description": "Medusa v2 plugin adding full support for variant-level promotions with native search, automatic subscriber, and Admin UI creation wizard.",
-  "main": "dist/index.js",
+  "main": "index.js",
   "types": "dist/index.d.ts",
   "keywords": [
     "medusa",
@@ -15,6 +15,7 @@
   "author": "Monfil Store",
   "license": "MIT",
   "files": [
+    "src",
     "dist",
     "README.md"
   ],
