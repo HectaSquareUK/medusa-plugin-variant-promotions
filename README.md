@@ -31,7 +31,9 @@ pnpm add @hectasquare/medusa-plugin-variant-promotions
 
 ## ⚙️ Configuration
 
-Register the plugin in your `medusa-config.js` (or `medusa-config.ts`) under the `plugins` array:
+### 1. Register Plugin in `medusa-config.js`
+
+Add the plugin to `medusa-config.js` (or `medusa-config.ts`) under the `plugins` array:
 
 ```javascript
 module.exports = defineConfig({
@@ -48,18 +50,49 @@ module.exports = defineConfig({
 
 ---
 
+### 🎨 2. Admin UI Routes Setup
+
+To add the **Variant Promotions** sidebar navigation and **4-Step Creation Wizard** to your Medusa Admin dashboard, create 2 small entry files in your store's `src/admin/routes/`:
+
+#### File 1: `src/admin/routes/variant-promotions/page.tsx`
+```tsx
+import { VariantPromotionsListPage } from "@hectasquare/medusa-plugin-variant-promotions/dist/components/list-page"
+import { defineRouteConfig } from "@medusajs/admin-sdk"
+import { Tag } from "@medusajs/icons"
+
+export const config = defineRouteConfig({
+  label: "Variant Promotions",
+  icon: Tag,
+})
+
+export default VariantPromotionsListPage
+```
+
+#### File 2: `src/admin/routes/variant-promotions/create/page.tsx`
+```tsx
+import { CreateVariantPromotionPage } from "@hectasquare/medusa-plugin-variant-promotions/dist/components/create-page"
+import { defineRouteConfig } from "@medusajs/admin-sdk"
+
+export const config = defineRouteConfig({
+  label: "Create Variant Promotion",
+})
+
+export default CreateVariantPromotionPage
+```
+
+---
+
 ## 🚀 Usage
 
-Once installed and configured, start your Medusa server:
+Once configured, start your Medusa server:
 
 ```bash
 npx medusa dev
 ```
 
 1. Open your Medusa Admin dashboard at `http://localhost:9000/app`.
-2. Navigate to **Variant Promotions** in the sidebar.
-3. Click **+ Create variant promotion** to launch the wizard.
-4. Pick specific product variants, configure discount options and target regions, and publish!
+2. Click **Variant Promotions** in the sidebar.
+3. Click **+ Create variant promotion** to launch the wizard!
 
 ---
 
