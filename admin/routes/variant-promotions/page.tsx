@@ -1,4 +1,4 @@
-import { VariantPromotionsListPage } from "../../src/components/list-page"
+import { VariantPromotionsListPage } from "../../../src/components/list-page"
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { Tag } from "@medusajs/icons"
 

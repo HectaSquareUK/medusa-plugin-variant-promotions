@@ -56,7 +56,7 @@ export function PromotionVariantDetailWidget({
     return null
   }
 
-  const variantById = new Map((variants ?? []).map((v) => [v.id, v]))
+  const variantById = new Map((variants ?? []).map((v: any) => [v.id, v]))
 
   return (
     <Container className="p-0 divide-y">
@@ -95,7 +95,7 @@ export function PromotionVariantDetailWidget({
             )}
             {!isLoading &&
               ids.map((id) => {
-                const v = variantById.get(id)
+                const v = (variantById.get(id) ?? {}) as any
                 const productId = v?.product?.id ?? v?.product_id
                 const productTitle = v?.product?.title ?? "Product"
                 const thumbnail = v?.product?.thumbnail
