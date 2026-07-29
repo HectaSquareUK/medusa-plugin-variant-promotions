@@ -1,4 +1,4 @@
-# medusa-plugin-variant-promotions
+# @hectasquare/medusa-plugin-variant-promotions
 
 A Medusa v2 plugin that enables **Variant-Level Promotions** with full Medusa Core option parity, debounced server-side variant search, automated cart promotion application, and custom Medusa Admin UI extensions.
 
@@ -22,9 +22,9 @@ A Medusa v2 plugin that enables **Variant-Level Promotions** with full Medusa Co
 In your Medusa v2 backend project, install the package:
 
 ```bash
-npm install github:HectaSquareUK/medusa-plugin-variant-promotions
+npm install @hectasquare/medusa-plugin-variant-promotions
 # or
-pnpm add github:HectaSquareUK/medusa-plugin-variant-promotions
+pnpm add @hectasquare/medusa-plugin-variant-promotions
 ```
 
 ---
@@ -40,7 +40,7 @@ module.exports = defineConfig({
   },
   plugins: [
     {
-      resolve: "medusa-plugin-variant-promotions",
+      resolve: "@hectasquare/medusa-plugin-variant-promotions",
     },
   ],
 })
