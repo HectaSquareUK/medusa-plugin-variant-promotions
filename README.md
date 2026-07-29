@@ -19,39 +19,21 @@ A Medusa v2 plugin that enables **Variant-Level Promotions** with full Medusa Co
 
 ## 📦 Installation
 
+In your Medusa v2 backend project, install the package:
+
 ```bash
-npm install medusa-plugin-variant-promotions
+npm install github:HectaSquareUK/medusa-plugin-variant-promotions
 # or
-yarn add medusa-plugin-variant-promotions
-# or
-pnpm add medusa-plugin-variant-promotions
+pnpm add github:HectaSquareUK/medusa-plugin-variant-promotions
 ```
 
----
-
-## ⚙️ Configuration
-
-Register the plugin in your `medusa-config.js`:
-
-```javascript
-module.exports = defineConfig({
-  projectConfig: {
-    // ... your project config
-  },
-  plugins: [
-    {
-      resolve: "medusa-plugin-variant-promotions",
-      options: {},
-    },
-  ],
-})
-```
+Medusa v2 automatically discovers and loads the plugin's Admin UI extensions, API routes, workflows, and subscribers upon server startup (`npx medusa dev`).
 
 ---
 
 ## 🚀 Usage
 
-Once configured, start your Medusa server:
+Once installed, start your Medusa server:
 
 ```bash
 npx medusa dev
