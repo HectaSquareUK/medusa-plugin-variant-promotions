@@ -7,7 +7,7 @@ export const CreateVariantPromotionSchema = z
     code: z
       .string()
       .min(3, "Code must be at least 3 characters")
-      .transform((val) => val.trim().toUpperCase()),
+      .transform((val: string) => val.trim().toUpperCase()),
     description: z.string().optional(),
     type: z
       .enum(["percentage_off_product", "buy_x_get_y"])
@@ -41,7 +41,7 @@ export const CreateVariantPromotionSchema = z
     campaign_id: z.string().optional(),
   })
   .refine(
-    (data) => {
+    (data: any) => {
       if (data.discount_kind === "percentage" && data.value > 100) {
         return false
       }
@@ -53,7 +53,7 @@ export const CreateVariantPromotionSchema = z
     }
   )
   .refine(
-    (data) => {
+    (data: any) => {
       if (data.type === "buy_x_get_y") {
         return (
           !!data.buy_variant_ids &&

@@ -111,8 +111,8 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     )
     const variantIds = (targetRule?.values ?? []).map((v: any) => v.value)
     const enrichedVariants = variantIds.map((id: string) => {
-      const v = variantById.get(id) ?? { id, product_id: undefined }
-      const product = v.product_id ? productById.get(v.product_id) : undefined
+      const v = (variantById.get(id) ?? { id, product_id: undefined }) as any
+      const product = v.product_id ? (productById.get(v.product_id) as any) : undefined
       return {
         ...v,
         product_title: product?.title ?? null,
