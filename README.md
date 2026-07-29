@@ -27,13 +27,30 @@ npm install github:HectaSquareUK/medusa-plugin-variant-promotions
 pnpm add github:HectaSquareUK/medusa-plugin-variant-promotions
 ```
 
-Medusa v2 automatically discovers and loads the plugin's Admin UI extensions, API routes, workflows, and subscribers upon server startup (`npx medusa dev`).
+---
+
+## ⚙️ Configuration
+
+Register the plugin in your `medusa-config.js` (or `medusa-config.ts`) under the `plugins` array:
+
+```javascript
+module.exports = defineConfig({
+  projectConfig: {
+    // ... your project config
+  },
+  plugins: [
+    {
+      resolve: "medusa-plugin-variant-promotions",
+    },
+  ],
+})
+```
 
 ---
 
 ## 🚀 Usage
 
-Once installed, start your Medusa server:
+Once installed and configured, start your Medusa server:
 
 ```bash
 npx medusa dev
