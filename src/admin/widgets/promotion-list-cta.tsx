@@ -12,12 +12,13 @@ const navigate = (path: string) => {
 }
 
 /**
- * Injected at `promotion.list.after`. Discoverability CTA nudge —
- * points directly to the dedicated variant promotion creation wizard.
+ * Injected at `promotion.list.after`. Purely a discoverability CTA widget —
+ * displays at the bottom of the native Promotions list page to jump straight
+ * to creating a variant-level promotion.
  */
-export const PromotionListCtaWidget = () => {
+const PromotionListCtaWidget = () => {
   return (
-    <Container className="flex items-center justify-between px-6 py-4">
+    <Container className="flex items-center justify-between px-6 py-4 mt-4">
       <div className="flex items-center gap-x-3">
         <Tag className="text-ui-fg-muted" />
         <div>
@@ -25,8 +26,7 @@ export const PromotionListCtaWidget = () => {
             Need to discount specific variants instead of whole products?
           </Text>
           <Text size="small" className="text-ui-fg-subtle">
-            Use Variant Promotions to target hand-picked variants across
-            any products.
+            Use Variant Promotions to target hand-picked variants across any products.
           </Text>
         </div>
       </div>

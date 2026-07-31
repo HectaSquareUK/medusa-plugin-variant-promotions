@@ -1,183 +1,196 @@
-import { useState, useEffect } from "react"
-import { Input, Badge, Button, Text } from "@medusajs/ui"
-import { Plus, XCircle } from "@medusajs/icons"
+import { useState, useMemo, useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { Badge, Input, Text, Checkbox, Table } from "@medusajs/ui"
+import { MagnifyingGlass } from "@medusajs/icons"
 
-type VariantSummary = {
+type VariantRow = {
   id: string
   title: string
-  sku?: string
-  product_id?: string
+  sku: string | null
+  product_id: string
+  product_title: string
+  thumbnail?: string | null
+  calculated_price?: { calculated_amount: number; currency_code: string } | null
 }
 
 type VariantPickerProps = {
   selected: string[]
-  onChange: (ids: string[]) => void
-  label?: string
+  onChange: (variantIds: string[]) => void
+  disabledIds?: string[]
+  currencyCode?: string
 }
 
 export function VariantPicker({
   selected,
   onChange,
-  label = "Select variants to discount",
+  disabledIds = [],
+  currencyCode = "usd",
 }: VariantPickerProps) {
-  const [query, setQuery] = useState("")
-  const [debouncedQuery, setDebouncedQuery] = useState("")
-  const [results, setResults] = useState<VariantSummary[]>([])
-  const [loading, setLoading] = useState(false)
-  const [selectedDetails, setSelectedDetails] = useState<
-    Record<string, VariantSummary>
-  >({})
+  const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
 
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedQuery(query)
-    }, 300)
-    return () => clearTimeout(handler)
-  }, [query])
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
 
-  useEffect(() => {
-    let active = true
-    setLoading(true)
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["variant-picker-search", debouncedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (debouncedSearch) {
+        params.append("q", debouncedSearch)
+      }
+      params.append("limit", "50")
 
-    const params = new URLSearchParams()
-    if (debouncedQuery.trim()) {
-      params.set("q", debouncedQuery.trim())
-    }
-    params.set("limit", "50")
-
-    fetch(`/admin/product-variants?${params.toString()}`, {
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-    })
-      .then((res) => {
-        if (!res.ok) return { variants: [] }
-        return res.json()
-      })
-      .then((data) => {
-        if (!active) return
-        const list = (data.variants ?? []) as VariantSummary[]
-        setResults(list)
-        setLoading(false)
-
-        setSelectedDetails((prev) => {
-          const next = { ...prev }
-          for (const v of list) {
-            if (selected.includes(v.id)) {
-              next[v.id] = v
-            }
-          }
-          return next
-        })
-      })
-      .catch(() => {
-        if (active) setLoading(false)
+      const res = await fetch(`/admin/product-variants?${params.toString()}`, {
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
       })
 
-    return () => {
-      active = false
-    }
-  }, [debouncedQuery])
+      if (!res.ok) {
+        throw new Error("Failed to fetch product variants")
+      }
 
-  const toggleSelect = (variant: VariantSummary) => {
-    if (selected.includes(variant.id)) {
-      onChange(selected.filter((id) => id !== variant.id))
+      const json = await res.json()
+      const variants = json.variants ?? []
+
+      return variants.map((v: any) => ({
+        id: v.id,
+        title: v.title,
+        sku: v.sku,
+        product_id: v.product?.id ?? v.product_id,
+        product_title: v.product?.title ?? "Product",
+        thumbnail: v.product?.thumbnail,
+        calculated_price: v.calculated_price ?? null,
+      })) as VariantRow[]
+    },
+  })
+
+  const selectedSet = useMemo(() => new Set(selected), [selected])
+
+  const toggle = (variantId: string) => {
+    if (selectedSet.has(variantId)) {
+      onChange(selected.filter((id) => id !== variantId))
     } else {
-      onChange([...selected, variant.id])
-      setSelectedDetails((prev) => ({ ...prev, [variant.id]: variant }))
+      onChange([...selected, variantId])
     }
-  }
-
-  const removeId = (id: string) => {
-    onChange(selected.filter((i) => i !== id))
   }
 
   return (
-    <div className="flex flex-col gap-y-3">
-      {label && <Text className="font-medium text-sm">{label}</Text>}
+    <div className="flex flex-col gap-y-4">
+      <div className="relative">
+        <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-ui-fg-muted" />
+        <Input
+          className="pl-9"
+          placeholder="Search by product title or SKU across all products…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
 
-      <Input
-        placeholder="Search variants by title, SKU, or option..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
-
-      {/* Selected variants badges */}
       {selected.length > 0 && (
-        <div className="flex flex-wrap gap-2 p-3 bg-ui-bg-subtle rounded-md border">
-          {selected.map((id) => {
-            const v = selectedDetails[id]
-            const title = v?.title ? `${v.title}` : id
-            const sku = v?.sku ? ` (${v.sku})` : ""
-            return (
-              <Badge
-                key={id}
-                color="blue"
-                className="flex items-center gap-x-1 font-mono text-xs"
-              >
-                <span>
-                  {title}
-                  {sku}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => removeId(id)}
-                  className="hover:text-ui-fg-error"
-                >
-                  <XCircle className="w-3.5 h-3.5" />
-                </button>
-              </Badge>
-            )
-          })}
+        <div className="flex items-center gap-x-2">
+          <Text size="small" weight="plus">
+            {selected.length} variant{selected.length !== 1 ? "s" : ""} selected
+          </Text>
         </div>
       )}
 
-      {/* Results list */}
-      <div className="border rounded-md max-h-60 overflow-y-auto divide-y">
-        {loading && (
-          <div className="p-3 text-xs text-ui-fg-subtle text-center">
-            Searching variants...
-          </div>
-        )}
+      {isError && (
+        <Text size="small" className="text-ui-fg-error">
+          Couldn't load variants. Check your network connection and try again.
+        </Text>
+      )}
 
-        {!loading && results.length === 0 && (
-          <div className="p-3 text-xs text-ui-fg-subtle text-center">
-            No variants found matching "{query}"
-          </div>
-        )}
-
-        {!loading &&
-          results.map((v) => {
-            const isSelected = selected.includes(v.id)
-            return (
-              <div
-                key={v.id}
-                className="flex items-center justify-between p-2.5 hover:bg-ui-bg-subtle text-xs"
-              >
-                <div className="flex flex-col">
-                  <span className="font-medium">{v.title}</span>
-                  {v.sku && (
-                    <span className="text-ui-fg-subtle font-mono text-[10px]">
-                      SKU: {v.sku}
-                    </span>
-                  )}
-                </div>
-                <Button
-                  size="small"
-                  variant={isSelected ? "secondary" : "transparent"}
-                  onClick={() => toggleSelect(v)}
-                  className="flex items-center gap-x-1"
+      <div className="border rounded-lg overflow-hidden max-h-96 overflow-y-auto">
+        <Table>
+          <Table.Header>
+            <Table.Row>
+              <Table.HeaderCell className="w-12" />
+              <Table.HeaderCell>Product</Table.HeaderCell>
+              <Table.HeaderCell>Variant</Table.HeaderCell>
+              <Table.HeaderCell>SKU</Table.HeaderCell>
+              <Table.HeaderCell className="text-right">Price</Table.HeaderCell>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {isLoading && (
+              <Table.Row>
+                <Table.Cell {...({ colSpan: 5 } as any)}>
+                  <Text size="small" className="text-ui-fg-subtle py-4">
+                    Loading variants…
+                  </Text>
+                </Table.Cell>
+              </Table.Row>
+            )}
+            {!isLoading && data?.length === 0 && (
+              <Table.Row>
+                <Table.Cell {...({ colSpan: 5 } as any)}>
+                  <Text size="small" className="text-ui-fg-subtle py-4">
+                    No variants match "{debouncedSearch}"
+                  </Text>
+                </Table.Cell>
+              </Table.Row>
+            )}
+            {data?.map((row) => {
+              const isDisabledFlag = disabledIds.includes(row.id)
+              return (
+                <Table.Row
+                  key={row.id}
+                  className="cursor-pointer hover:bg-ui-bg-subtle-hover"
+                  onClick={() => toggle(row.id)}
                 >
-                  {isSelected ? (
-                    "Selected"
-                  ) : (
-                    <>
-                      <Plus className="w-3 h-3" /> Select
-                    </>
-                  )}
-                </Button>
-              </div>
-            )
-          })}
+                  <Table.Cell onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selectedSet.has(row.id)}
+                      onCheckedChange={() => toggle(row.id)}
+                    />
+                  </Table.Cell>
+                  <Table.Cell>
+                    <div className="flex items-center gap-x-2">
+                      {row.thumbnail && (
+                        <img
+                          src={row.thumbnail}
+                          alt=""
+                          className="w-6 h-6 rounded object-cover"
+                        />
+                      )}
+                      <Text size="small">{row.product_title}</Text>
+                    </div>
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Text size="small">{row.title}</Text>
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Text size="small" className="text-ui-fg-subtle font-mono">
+                      {row.sku ?? "—"}
+                    </Text>
+                  </Table.Cell>
+                  <Table.Cell className="text-right">
+                    <div className="flex items-center justify-end gap-x-2">
+                      {row.calculated_price && (
+                        <Text size="small">
+                          {(
+                            row.calculated_price.calculated_amount / 100
+                          ).toLocaleString(undefined, {
+                            style: "currency",
+                            currency: row.calculated_price.currency_code,
+                          })}
+                        </Text>
+                      )}
+                      {isDisabledFlag && (
+                        <Badge size="xsmall" color="orange">
+                          on another promo
+                        </Badge>
+                      )}
+                    </div>
+                  </Table.Cell>
+                </Table.Row>
+              )
+            })}
+          </Table.Body>
+        </Table>
       </div>
     </div>
   )

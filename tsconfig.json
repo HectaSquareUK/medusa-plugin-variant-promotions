@@ -15,6 +15,8 @@
     "paths": {
       "@medusajs/framework/*": ["../backend/node_modules/@medusajs/framework/dist/*"],
       "@medusajs/framework": ["../backend/node_modules/@medusajs/framework/dist"],
+      "@medusajs/utils/*": ["../backend/node_modules/@medusajs/utils/dist/*"],
+      "@medusajs/utils": ["../backend/node_modules/@medusajs/utils/dist"],
       "@medusajs/medusa/*": ["../backend/node_modules/@medusajs/medusa/dist/*"],
       "@medusajs/medusa": ["../backend/node_modules/@medusajs/medusa/dist"],
       "@medusajs/admin-sdk": ["../backend/node_modules/@medusajs/admin-sdk/dist"],

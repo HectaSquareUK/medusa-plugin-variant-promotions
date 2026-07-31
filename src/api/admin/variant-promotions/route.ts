@@ -1,26 +1,59 @@
-import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { Modules } from "@medusajs/framework/utils"
-import { createVariantPromotionWorkflow } from "../../../workflows/create-variant-promotion"
+import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import { Modules } from "@medusajs/utils"
 import {
   CreateVariantPromotionSchema,
   RESOLVED_VARIANT_ATTRIBUTE,
 } from "../../../validators"
+import {
+  createVariantPromotionWorkflow,
+  CreateVariantPromotionWorkflowInput,
+} from "../../../workflows/create-variant-promotion"
 
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
-  const parseResult = CreateVariantPromotionSchema.safeParse(req.body)
+  const parsed = CreateVariantPromotionSchema.safeParse(req.body)
 
-  if (!parseResult.success) {
+  if (!parsed.success) {
     return res.status(400).json({
-      message: "Validation failed",
-      errors: parseResult.error.flatten(),
+      error: "validation_error",
+      message: "Request body failed validation",
+      details: parsed.error.flatten(),
     })
   }
 
-  const input = parseResult.data
+  const input = parsed.data as CreateVariantPromotionWorkflowInput
+
+  const productModuleService = req.scope.resolve(Modules.PRODUCT)
+  const allRequestedIds = Array.from(
+    new Set([...input.variant_ids, ...(input.buy_variant_ids ?? [])])
+  )
+  const foundVariants = await productModuleService.listProductVariants({
+    id: allRequestedIds,
+  })
+  const foundIds = new Set(foundVariants.map((v: any) => v.id))
+  const missing = allRequestedIds.filter((id) => !foundIds.has(id))
+
+  if (missing.length > 0) {
+    return res.status(400).json({
+      error: "invalid_variant_ids",
+      message: "One or more variant_ids do not exist",
+      missing_ids: missing,
+    })
+  }
+
+  const promotionModuleService = req.scope.resolve(Modules.PROMOTION)
+  const existing = await promotionModuleService.listPromotions({
+    code: input.code.toUpperCase(),
+  })
+  if (existing.length > 0) {
+    return res.status(409).json({
+      error: "duplicate_code",
+      message: `A promotion with code "${input.code.toUpperCase()}" already exists`,
+    })
+  }
 
   try {
     const { result } = await createVariantPromotionWorkflow(req.scope).run({
-      input: input as any,
+      input,
     })
     const promo = Array.isArray(result)
       ? result[0]
@@ -28,9 +61,15 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     return res.status(201).json({
       promotion: promo,
+      variant_count: input.variant_ids.length,
+      resolved_attribute_used: RESOLVED_VARIANT_ATTRIBUTE,
     })
   } catch (error: any) {
-    return res.status(400).json({
+    req.scope.resolve("logger").error(
+      `Failed to create variant promotion: ${error?.message}`
+    )
+    return res.status(500).json({
+      error: "workflow_error",
       message: error?.message ?? "Failed to create promotion",
     })
   }
@@ -93,9 +132,9 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
           { select: ["id", "title", "sku", "product_id"] }
         )
       : []
-  const variantById = new Map(variants.map((v) => [v.id, v]))
+  const variantById = new Map(variants.map((v: any) => [v.id, v]))
 
-  const allProductIds = Array.from(new Set(variants.map((v) => v.product_id).filter(Boolean)))
+  const allProductIds = Array.from(new Set(variants.map((v: any) => v.product_id).filter(Boolean)))
   const products =
     allProductIds.length > 0
       ? await productModuleService.listProducts(
@@ -103,7 +142,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
           { select: ["id", "title"] }
         )
       : []
-  const productById = new Map(products.map((p) => [p.id, p]))
+  const productById = new Map(products.map((p: any) => [p.id, p]))
 
   const enriched = variantPromotions.map((p) => {
     const targetRule = (p.application_method?.target_rules ?? []).find(
@@ -112,7 +151,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     const variantIds = (targetRule?.values ?? []).map((v: any) => v.value)
     const enrichedVariants = variantIds.map((id: string) => {
       const v = (variantById.get(id) ?? { id, product_id: undefined }) as any
-      const product = v.product_id ? (productById.get(v.product_id) as any) : undefined
+      const product = (v.product_id ? productById.get(v.product_id) : undefined) as any
       return {
         ...v,
         product_title: product?.title ?? null,

@@ -2,75 +2,106 @@ import { z } from "zod"
 
 export const RESOLVED_VARIANT_ATTRIBUTE = "items.variant.id"
 
+const promotionTypeEnum = z.enum(["amount_off_products", "percentage_off_product", "buy_x_get_y"])
+
 export const CreateVariantPromotionSchema = z
   .object({
     code: z
       .string()
+      .trim()
       .min(3, "Code must be at least 3 characters")
-      .transform((val: string) => val.trim().toUpperCase()),
-    description: z.string().optional(),
-    type: z
-      .enum(["percentage_off_product", "buy_x_get_y"])
-      .default("percentage_off_product"),
+      .max(64, "Code must be at most 64 characters")
+      .regex(/^[A-Za-z0-9_-]+$/, "Code may only contain letters, numbers, - and _"),
+    description: z.string().max(500).optional(),
+    type: promotionTypeEnum,
+    currency_code: z.string().length(3, "currency_code must be a 3-letter ISO code"),
 
-    currency_code: z.string().min(3).default("usd"),
-    discount_kind: z.enum(["percentage", "fixed"]).default("percentage"),
-    value: z.number().positive("Discount value must be greater than 0"),
-
-    allocation: z.enum(["each", "across", "once"]).default("each"),
+    discount_kind: z.enum(["percentage", "fixed"]),
+    value: z.number().positive("value must be greater than 0"),
+    allocation: z.enum(["each", "across", "once"]).optional().default("each"),
     max_quantity: z.number().int().positive().optional(),
 
-    status: z.enum(["active", "draft"]).default("active"),
-    is_automatic: z.boolean().default(false),
-    is_tax_inclusive: z.boolean().default(false),
+    variant_ids: z
+      .array(z.string().min(1))
+      .min(1, "At least one variant_id is required")
+      .max(500, "A single promotion supports at most 500 variants — split into multiple promotions beyond that")
+      .transform((ids) => Array.from(new Set(ids))),
 
+    buy_variant_ids: z.array(z.string().min(1)).optional(),
+    buy_min_quantity: z.number().int().positive().optional(),
+    apply_to_quantity: z.number().int().positive().optional(),
+
+    status: z.enum(["active", "draft"]).optional().default("active"),
+    is_tax_inclusive: z.boolean().optional().default(false),
     usage_limit: z.number().int().positive().optional(),
     customer_group_ids: z.array(z.string()).optional(),
     region_ids: z.array(z.string()).optional(),
-
-    starts_at: z.string().datetime({ offset: true }).optional(),
-    ends_at: z.string().datetime({ offset: true }).optional(),
-
-    variant_ids: z
-      .array(z.string())
-      .min(1, "Select at least one variant for this promotion"),
-
-    buy_variant_ids: z.array(z.string()).optional(),
-    buy_min_quantity: z.number().int().positive().optional(),
-
+    starts_at: z.coerce.date().optional(),
+    ends_at: z.coerce.date().optional(),
     campaign_id: z.string().optional(),
+    is_automatic: z.boolean().default(false),
   })
-  .refine(
-    (data: any) => {
-      if (data.discount_kind === "percentage" && data.value > 100) {
-        return false
-      }
-      return true
-    },
-    {
-      message: "Percentage discount cannot exceed 100%",
-      path: ["value"],
+  .superRefine((data, ctx) => {
+    if (data.discount_kind === "percentage" && data.value > 100) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["value"],
+        message: "Percentage value cannot exceed 100",
+      })
     }
-  )
-  .refine(
-    (data: any) => {
-      if (data.type === "buy_x_get_y") {
-        return (
-          !!data.buy_variant_ids &&
-          data.buy_variant_ids.length > 0 &&
-          typeof data.buy_min_quantity === "number" &&
-          data.buy_min_quantity > 0
-        )
+    if (data.type === "buy_x_get_y") {
+      if (!data.buy_variant_ids || data.buy_variant_ids.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["buy_variant_ids"],
+          message: "buy_variant_ids is required when type is buy_x_get_y",
+        })
       }
-      return true
-    },
-    {
-      message:
-        "Buy X Get Y promotions require at least one 'buy' variant and a minimum buy quantity",
-      path: ["buy_variant_ids"],
+      if (!data.buy_min_quantity) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["buy_min_quantity"],
+          message: "buy_min_quantity is required when type is buy_x_get_y",
+        })
+      }
+      const overlap = data.buy_variant_ids?.filter((id) =>
+        data.variant_ids.includes(id)
+      )
+      if (
+        overlap &&
+        overlap.length > 0 &&
+        data.variant_ids.length === 1 &&
+        data.buy_variant_ids!.length === 1 &&
+        data.discount_kind === "percentage" &&
+        data.value === 100
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["variant_ids"],
+          message:
+            "buy_variant_ids and variant_ids cannot be the sole, identical single variant with 100% off — this creates an unbounded free-item loop. Add a distinct 'get' variant.",
+        })
+      }
     }
-  )
+    if (data.starts_at && data.ends_at && data.ends_at <= data.starts_at) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ends_at"],
+        message: "ends_at must be after starts_at",
+      })
+    }
+  })
 
 export type CreateVariantPromotionInput = z.infer<
   typeof CreateVariantPromotionSchema
 >
+
+export const TargetRulesBatchSchema = z.object({
+  add: z.array(z.string().min(1)).optional().default([]),
+  remove: z.array(z.string().min(1)).optional().default([]),
+}).refine(
+  (d) => d.add.length > 0 || d.remove.length > 0,
+  { message: "Provide at least one variant id in `add` or `remove`" }
+)
+
+export type TargetRulesBatchInput = z.infer<typeof TargetRulesBatchSchema>

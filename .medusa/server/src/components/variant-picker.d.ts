@@ -1,7 +1,8 @@
 type VariantPickerProps = {
     selected: string[];
-    onChange: (ids: string[]) => void;
-    label?: string;
+    onChange: (variantIds: string[]) => void;
+    disabledIds?: string[];
+    currencyCode?: string;
 };
-export declare function VariantPicker({ selected, onChange, label, }: VariantPickerProps): import("react/jsx-runtime").JSX.Element;
+export declare function VariantPicker({ selected, onChange, disabledIds, currencyCode, }: VariantPickerProps): import("react/jsx-runtime").JSX.Element;
 export {};

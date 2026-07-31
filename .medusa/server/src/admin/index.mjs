@@ -1,55 +1,113 @@
-import { jsxs, jsx, Fragment } from "react/jsx-runtime";
+import { jsxs, jsx } from "react/jsx-runtime";
 import { defineWidgetConfig, defineRouteConfig } from "@medusajs/admin-sdk";
+import { Container, Text, Button, Heading, Badge, Table, Input, Checkbox, Label, Switch, RadioGroup, Select, toast } from "@medusajs/ui";
+import { Tag, Plus, ArrowUpRightOnBox, MagnifyingGlass } from "@medusajs/icons";
 import { useQuery } from "@tanstack/react-query";
-import { Container, Heading, Text, Badge, Table, Button, Input, Label, Select, Checkbox, toast } from "@medusajs/ui";
 import { z } from "zod";
-import { Tag, Plus, ArrowUpRightOnBox, XCircle } from "@medusajs/icons";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import "@medusajs/admin-shared";
+const navigate$1 = (path) => {
+  if (typeof window !== "undefined") {
+    const target = path.startsWith("/app") ? path : `/app${path.startsWith("/") ? path : "/" + path}`;
+    window.location.href = target;
+  }
+};
+const PromotionListCtaWidget = () => {
+  return /* @__PURE__ */ jsxs(Container, { className: "flex items-center justify-between px-6 py-4 mt-4", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-x-3", children: [
+      /* @__PURE__ */ jsx(Tag, { className: "text-ui-fg-muted" }),
+      /* @__PURE__ */ jsxs("div", { children: [
+        /* @__PURE__ */ jsx(Text, { weight: "plus", size: "small", children: "Need to discount specific variants instead of whole products?" }),
+        /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle", children: "Use Variant Promotions to target hand-picked variants across any products." })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsx(
+      Button,
+      {
+        variant: "secondary",
+        size: "small",
+        onClick: () => navigate$1("/variant-promotions/create"),
+        children: "Create variant promotion"
+      }
+    )
+  ] });
+};
+defineWidgetConfig({
+  zone: "promotion.list.after"
+});
 const RESOLVED_VARIANT_ATTRIBUTE = "items.variant.id";
+const promotionTypeEnum = z.enum(["amount_off_products", "percentage_off_product", "buy_x_get_y"]);
 z.object({
-  code: z.string().min(3, "Code must be at least 3 characters").transform((val) => val.trim().toUpperCase()),
-  description: z.string().optional(),
-  type: z.enum(["percentage_off_product", "buy_x_get_y"]).default("percentage_off_product"),
-  currency_code: z.string().min(3).default("usd"),
-  discount_kind: z.enum(["percentage", "fixed"]).default("percentage"),
-  value: z.number().positive("Discount value must be greater than 0"),
-  allocation: z.enum(["each", "across", "once"]).default("each"),
+  code: z.string().trim().min(3, "Code must be at least 3 characters").max(64, "Code must be at most 64 characters").regex(/^[A-Za-z0-9_-]+$/, "Code may only contain letters, numbers, - and _"),
+  description: z.string().max(500).optional(),
+  type: promotionTypeEnum,
+  currency_code: z.string().length(3, "currency_code must be a 3-letter ISO code"),
+  discount_kind: z.enum(["percentage", "fixed"]),
+  value: z.number().positive("value must be greater than 0"),
+  allocation: z.enum(["each", "across", "once"]).optional().default("each"),
   max_quantity: z.number().int().positive().optional(),
-  status: z.enum(["active", "draft"]).default("active"),
-  is_automatic: z.boolean().default(false),
-  is_tax_inclusive: z.boolean().default(false),
+  variant_ids: z.array(z.string().min(1)).min(1, "At least one variant_id is required").max(500, "A single promotion supports at most 500 variants — split into multiple promotions beyond that").transform((ids) => Array.from(new Set(ids))),
+  buy_variant_ids: z.array(z.string().min(1)).optional(),
+  buy_min_quantity: z.number().int().positive().optional(),
+  apply_to_quantity: z.number().int().positive().optional(),
+  status: z.enum(["active", "draft"]).optional().default("active"),
+  is_tax_inclusive: z.boolean().optional().default(false),
   usage_limit: z.number().int().positive().optional(),
   customer_group_ids: z.array(z.string()).optional(),
   region_ids: z.array(z.string()).optional(),
-  starts_at: z.string().datetime({ offset: true }).optional(),
-  ends_at: z.string().datetime({ offset: true }).optional(),
-  variant_ids: z.array(z.string()).min(1, "Select at least one variant for this promotion"),
-  buy_variant_ids: z.array(z.string()).optional(),
-  buy_min_quantity: z.number().int().positive().optional(),
-  campaign_id: z.string().optional()
+  starts_at: z.coerce.date().optional(),
+  ends_at: z.coerce.date().optional(),
+  campaign_id: z.string().optional(),
+  is_automatic: z.boolean().default(false)
+}).superRefine((data, ctx) => {
+  var _a;
+  if (data.discount_kind === "percentage" && data.value > 100) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["value"],
+      message: "Percentage value cannot exceed 100"
+    });
+  }
+  if (data.type === "buy_x_get_y") {
+    if (!data.buy_variant_ids || data.buy_variant_ids.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["buy_variant_ids"],
+        message: "buy_variant_ids is required when type is buy_x_get_y"
+      });
+    }
+    if (!data.buy_min_quantity) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["buy_min_quantity"],
+        message: "buy_min_quantity is required when type is buy_x_get_y"
+      });
+    }
+    const overlap = (_a = data.buy_variant_ids) == null ? void 0 : _a.filter(
+      (id) => data.variant_ids.includes(id)
+    );
+    if (overlap && overlap.length > 0 && data.variant_ids.length === 1 && data.buy_variant_ids.length === 1 && data.discount_kind === "percentage" && data.value === 100) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["variant_ids"],
+        message: "buy_variant_ids and variant_ids cannot be the sole, identical single variant with 100% off — this creates an unbounded free-item loop. Add a distinct 'get' variant."
+      });
+    }
+  }
+  if (data.starts_at && data.ends_at && data.ends_at <= data.starts_at) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["ends_at"],
+      message: "ends_at must be after starts_at"
+    });
+  }
+});
+z.object({
+  add: z.array(z.string().min(1)).optional().default([]),
+  remove: z.array(z.string().min(1)).optional().default([])
 }).refine(
-  (data) => {
-    if (data.discount_kind === "percentage" && data.value > 100) {
-      return false;
-    }
-    return true;
-  },
-  {
-    message: "Percentage discount cannot exceed 100%",
-    path: ["value"]
-  }
-).refine(
-  (data) => {
-    if (data.type === "buy_x_get_y") {
-      return !!data.buy_variant_ids && data.buy_variant_ids.length > 0 && typeof data.buy_min_quantity === "number" && data.buy_min_quantity > 0;
-    }
-    return true;
-  },
-  {
-    message: "Buy X Get Y promotions require at least one 'buy' variant and a minimum buy quantity",
-    path: ["buy_variant_ids"]
-  }
+  (d) => d.add.length > 0 || d.remove.length > 0,
+  { message: "Provide at least one variant id in `add` or `remove`" }
 );
 function PromotionVariantDetailWidget({
   data: promotion
@@ -150,7 +208,7 @@ function PromotionVariantDetailWidget({
 defineWidgetConfig({
   zone: "promotion.details.after"
 });
-const nav$1 = (path) => {
+const nav = (path) => {
   if (typeof window !== "undefined") {
     window.location.href = path.startsWith("/app") ? path : `/app${path}`;
   }
@@ -182,7 +240,7 @@ function VariantPromotionsListPage() {
         {
           variant: "primary",
           size: "small",
-          onClick: () => nav$1("/variant-promotions/create"),
+          onClick: () => nav("/variant-promotions/create"),
           className: "flex items-center gap-x-2",
           children: [
             /* @__PURE__ */ jsx(Plus, {}),
@@ -215,7 +273,7 @@ function VariantPromotionsListPage() {
               {
                 variant: "secondary",
                 size: "small",
-                onClick: () => nav$1("/variant-promotions/create"),
+                onClick: () => nav("/variant-promotions/create"),
                 children: "Create your first variant promotion"
               }
             )
@@ -241,7 +299,7 @@ function VariantPromotionsListPage() {
               /* @__PURE__ */ jsx(Table.Cell, { children: /* @__PURE__ */ jsx("div", { className: "flex flex-col gap-y-1", children: uniqueProducts.length > 0 ? uniqueProducts.map((prod) => /* @__PURE__ */ jsx(
                 "button",
                 {
-                  onClick: () => nav$1(`/products/${prod.id}`),
+                  onClick: () => nav(`/products/${prod.id}`),
                   className: "text-ui-fg-interactive text-xs font-medium hover:underline text-left truncate max-w-[160px]",
                   title: prod.title ?? prod.id,
                   children: prod.title ?? prod.id
@@ -252,7 +310,7 @@ function VariantPromotionsListPage() {
                 variants.length > 0 ? variants.slice(0, 4).map((v) => /* @__PURE__ */ jsxs(
                   "button",
                   {
-                    onClick: () => v.product_id ? nav$1(`/products/${v.product_id}/variants/${v.id}`) : void 0,
+                    onClick: () => v.product_id ? nav(`/products/${v.product_id}/variants/${v.id}`) : void 0,
                     className: "inline-flex items-center gap-x-1 text-xs font-medium rounded px-1.5 py-0.5 bg-ui-bg-component border border-ui-border-base text-ui-fg-base hover:bg-ui-bg-component-hover hover:text-ui-fg-interactive cursor-pointer transition-colors",
                     title: v.sku ? `SKU: ${v.sku}` : v.id,
                     children: [
@@ -281,7 +339,7 @@ function VariantPromotionsListPage() {
                 {
                   variant: "transparent",
                   size: "small",
-                  onClick: () => nav$1(`/promotions/${p.id}`),
+                  onClick: () => nav(`/promotions/${p.id}`),
                   className: "inline-flex items-center gap-x-1 text-ui-fg-interactive hover:underline",
                   children: [
                     /* @__PURE__ */ jsx("span", { children: "View Detail" }),
@@ -303,191 +361,171 @@ const config$1 = defineRouteConfig({
 function VariantPicker({
   selected,
   onChange,
-  label = "Select variants to discount"
+  disabledIds = [],
+  currencyCode = "usd"
 }) {
-  const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedDetails, setSelectedDetails] = useState({});
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedQuery(query);
-    }, 300);
-    return () => clearTimeout(handler);
-  }, [query]);
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (debouncedQuery.trim()) {
-      params.set("q", debouncedQuery.trim());
-    }
-    params.set("limit", "50");
-    fetch(`/admin/product-variants?${params.toString()}`, {
-      headers: { "Content-Type": "application/json" },
-      credentials: "include"
-    }).then((res) => {
-      if (!res.ok) return { variants: [] };
-      return res.json();
-    }).then((data) => {
-      if (!active) return;
-      const list = data.variants ?? [];
-      setResults(list);
-      setLoading(false);
-      setSelectedDetails((prev) => {
-        const next = { ...prev };
-        for (const v of list) {
-          if (selected.includes(v.id)) {
-            next[v.id] = v;
-          }
-        }
-        return next;
-      });
-    }).catch(() => {
-      if (active) setLoading(false);
-    });
-    return () => {
-      active = false;
-    };
-  }, [debouncedQuery]);
-  const toggleSelect = (variant) => {
-    if (selected.includes(variant.id)) {
-      onChange(selected.filter((id) => id !== variant.id));
-    } else {
-      onChange([...selected, variant.id]);
-      setSelectedDetails((prev) => ({ ...prev, [variant.id]: variant }));
-    }
-  };
-  const removeId = (id) => {
-    onChange(selected.filter((i) => i !== id));
-  };
-  return /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-3", children: [
-    label && /* @__PURE__ */ jsx(Text, { className: "font-medium text-sm", children: label }),
-    /* @__PURE__ */ jsx(
-      Input,
-      {
-        placeholder: "Search variants by title, SKU, or option...",
-        value: query,
-        onChange: (e) => setQuery(e.target.value)
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["variant-picker-search", debouncedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (debouncedSearch) {
+        params.append("q", debouncedSearch);
       }
-    ),
-    selected.length > 0 && /* @__PURE__ */ jsx("div", { className: "flex flex-wrap gap-2 p-3 bg-ui-bg-subtle rounded-md border", children: selected.map((id) => {
-      const v = selectedDetails[id];
-      const title = (v == null ? void 0 : v.title) ? `${v.title}` : id;
-      const sku = (v == null ? void 0 : v.sku) ? ` (${v.sku})` : "";
-      return /* @__PURE__ */ jsxs(
-        Badge,
+      params.append("limit", "50");
+      const res = await fetch(`/admin/product-variants?${params.toString()}`, {
+        headers: { "Content-Type": "application/json" },
+        credentials: "include"
+      });
+      if (!res.ok) {
+        throw new Error("Failed to fetch product variants");
+      }
+      const json = await res.json();
+      const variants = json.variants ?? [];
+      return variants.map((v) => {
+        var _a, _b, _c;
+        return {
+          id: v.id,
+          title: v.title,
+          sku: v.sku,
+          product_id: ((_a = v.product) == null ? void 0 : _a.id) ?? v.product_id,
+          product_title: ((_b = v.product) == null ? void 0 : _b.title) ?? "Product",
+          thumbnail: (_c = v.product) == null ? void 0 : _c.thumbnail,
+          calculated_price: v.calculated_price ?? null
+        };
+      });
+    }
+  });
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const toggle = (variantId) => {
+    if (selectedSet.has(variantId)) {
+      onChange(selected.filter((id) => id !== variantId));
+    } else {
+      onChange([...selected, variantId]);
+    }
+  };
+  return /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-4", children: [
+    /* @__PURE__ */ jsxs("div", { className: "relative", children: [
+      /* @__PURE__ */ jsx(MagnifyingGlass, { className: "absolute left-3 top-1/2 -translate-y-1/2 text-ui-fg-muted" }),
+      /* @__PURE__ */ jsx(
+        Input,
         {
-          color: "blue",
-          className: "flex items-center gap-x-1 font-mono text-xs",
-          children: [
-            /* @__PURE__ */ jsxs("span", { children: [
-              title,
-              sku
-            ] }),
-            /* @__PURE__ */ jsx(
-              "button",
-              {
-                type: "button",
-                onClick: () => removeId(id),
-                className: "hover:text-ui-fg-error",
-                children: /* @__PURE__ */ jsx(XCircle, { className: "w-3.5 h-3.5" })
-              }
-            )
-          ]
-        },
-        id
-      );
-    }) }),
-    /* @__PURE__ */ jsxs("div", { className: "border rounded-md max-h-60 overflow-y-auto divide-y", children: [
-      loading && /* @__PURE__ */ jsx("div", { className: "p-3 text-xs text-ui-fg-subtle text-center", children: "Searching variants..." }),
-      !loading && results.length === 0 && /* @__PURE__ */ jsxs("div", { className: "p-3 text-xs text-ui-fg-subtle text-center", children: [
-        'No variants found matching "',
-        query,
-        '"'
-      ] }),
-      !loading && results.map((v) => {
-        const isSelected = selected.includes(v.id);
-        return /* @__PURE__ */ jsxs(
-          "div",
-          {
-            className: "flex items-center justify-between p-2.5 hover:bg-ui-bg-subtle text-xs",
-            children: [
-              /* @__PURE__ */ jsxs("div", { className: "flex flex-col", children: [
-                /* @__PURE__ */ jsx("span", { className: "font-medium", children: v.title }),
-                v.sku && /* @__PURE__ */ jsxs("span", { className: "text-ui-fg-subtle font-mono text-[10px]", children: [
-                  "SKU: ",
-                  v.sku
-                ] })
-              ] }),
-              /* @__PURE__ */ jsx(
-                Button,
-                {
-                  size: "small",
-                  variant: isSelected ? "secondary" : "transparent",
-                  onClick: () => toggleSelect(v),
-                  className: "flex items-center gap-x-1",
-                  children: isSelected ? "Selected" : /* @__PURE__ */ jsxs(Fragment, { children: [
-                    /* @__PURE__ */ jsx(Plus, { className: "w-3 h-3" }),
-                    " Select"
-                  ] })
-                }
-              )
-            ]
-          },
-          v.id
-        );
-      })
-    ] })
+          className: "pl-9",
+          placeholder: "Search by product title or SKU across all products…",
+          value: search,
+          onChange: (e) => setSearch(e.target.value)
+        }
+      )
+    ] }),
+    selected.length > 0 && /* @__PURE__ */ jsx("div", { className: "flex items-center gap-x-2", children: /* @__PURE__ */ jsxs(Text, { size: "small", weight: "plus", children: [
+      selected.length,
+      " variant",
+      selected.length !== 1 ? "s" : "",
+      " selected"
+    ] }) }),
+    isError && /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-error", children: "Couldn't load variants. Check your network connection and try again." }),
+    /* @__PURE__ */ jsx("div", { className: "border rounded-lg overflow-hidden max-h-96 overflow-y-auto", children: /* @__PURE__ */ jsxs(Table, { children: [
+      /* @__PURE__ */ jsx(Table.Header, { children: /* @__PURE__ */ jsxs(Table.Row, { children: [
+        /* @__PURE__ */ jsx(Table.HeaderCell, { className: "w-12" }),
+        /* @__PURE__ */ jsx(Table.HeaderCell, { children: "Product" }),
+        /* @__PURE__ */ jsx(Table.HeaderCell, { children: "Variant" }),
+        /* @__PURE__ */ jsx(Table.HeaderCell, { children: "SKU" }),
+        /* @__PURE__ */ jsx(Table.HeaderCell, { className: "text-right", children: "Price" })
+      ] }) }),
+      /* @__PURE__ */ jsxs(Table.Body, { children: [
+        isLoading && /* @__PURE__ */ jsx(Table.Row, { children: /* @__PURE__ */ jsx(Table.Cell, { ...{ colSpan: 5 }, children: /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle py-4", children: "Loading variants…" }) }) }),
+        !isLoading && (data == null ? void 0 : data.length) === 0 && /* @__PURE__ */ jsx(Table.Row, { children: /* @__PURE__ */ jsx(Table.Cell, { ...{ colSpan: 5 }, children: /* @__PURE__ */ jsxs(Text, { size: "small", className: "text-ui-fg-subtle py-4", children: [
+          'No variants match "',
+          debouncedSearch,
+          '"'
+        ] }) }) }),
+        data == null ? void 0 : data.map((row) => {
+          const isDisabledFlag = disabledIds.includes(row.id);
+          return /* @__PURE__ */ jsxs(
+            Table.Row,
+            {
+              className: "cursor-pointer hover:bg-ui-bg-subtle-hover",
+              onClick: () => toggle(row.id),
+              children: [
+                /* @__PURE__ */ jsx(Table.Cell, { onClick: (e) => e.stopPropagation(), children: /* @__PURE__ */ jsx(
+                  Checkbox,
+                  {
+                    checked: selectedSet.has(row.id),
+                    onCheckedChange: () => toggle(row.id)
+                  }
+                ) }),
+                /* @__PURE__ */ jsx(Table.Cell, { children: /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-x-2", children: [
+                  row.thumbnail && /* @__PURE__ */ jsx(
+                    "img",
+                    {
+                      src: row.thumbnail,
+                      alt: "",
+                      className: "w-6 h-6 rounded object-cover"
+                    }
+                  ),
+                  /* @__PURE__ */ jsx(Text, { size: "small", children: row.product_title })
+                ] }) }),
+                /* @__PURE__ */ jsx(Table.Cell, { children: /* @__PURE__ */ jsx(Text, { size: "small", children: row.title }) }),
+                /* @__PURE__ */ jsx(Table.Cell, { children: /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle font-mono", children: row.sku ?? "—" }) }),
+                /* @__PURE__ */ jsx(Table.Cell, { className: "text-right", children: /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-end gap-x-2", children: [
+                  row.calculated_price && /* @__PURE__ */ jsx(Text, { size: "small", children: (row.calculated_price.calculated_amount / 100).toLocaleString(void 0, {
+                    style: "currency",
+                    currency: row.calculated_price.currency_code
+                  }) }),
+                  isDisabledFlag && /* @__PURE__ */ jsx(Badge, { size: "xsmall", color: "orange", children: "on another promo" })
+                ] }) })
+              ]
+            },
+            row.id
+          );
+        })
+      ] })
+    ] }) })
   ] });
 }
-const nav = (path) => {
+const navigate = (path) => {
   if (typeof window !== "undefined") {
-    window.location.href = path.startsWith("/app") ? path : `/app${path}`;
+    const target = path.startsWith("/app") ? path : `/app${path.startsWith("/") ? path : "/" + path}`;
+    window.location.href = target;
   }
 };
 function CreateVariantPromotionPage() {
   const [step, setStep] = useState("type");
-  const [promoType, setPromoType] = useState(
-    "percentage_off_product"
-  );
-  const isBuyGet = promoType === "buy_x_get_y";
-  const [method, setMethod] = useState("code");
-  const isAutomatic = method === "automatic";
+  const [isAutomatic, setIsAutomatic] = useState(false);
   const [status, setStatus] = useState("active");
   const [code, setCode] = useState("");
-  const [discountKind, setDiscountKind] = useState("percentage");
-  const [value, setValue] = useState(10);
-  const [currencyCode, setCurrencyCode] = useState("usd");
-  const [allocation, setAllocation] = useState("each");
-  const [maxQuantity, setMaxQuantity] = useState(100);
-  const [isTaxInclusive, setIsTaxInclusive] = useState(false);
-  const [usageLimit, setUsageLimit] = useState(void 0);
+  const [type, setType] = useState("percentage_off_product");
   const [variantIds, setVariantIds] = useState([]);
   const [buyVariantIds, setBuyVariantIds] = useState([]);
   const [buyMinQuantity, setBuyMinQuantity] = useState(1);
   const [applyToQuantity, setApplyToQuantity] = useState(1);
+  const [discountKind, setDiscountKind] = useState(
+    "percentage"
+  );
+  const [value, setValue] = useState(10);
+  const [allocation, setAllocation] = useState(
+    "each"
+  );
+  const [maxQuantity, setMaxQuantity] = useState(100);
+  const [currencyCode, setCurrencyCode] = useState("cad");
+  const [isTaxInclusive, setIsTaxInclusive] = useState(false);
+  const [description, setDescription] = useState("");
+  const [usageLimit, setUsageLimit] = useState("");
   const [selectedCustomerGroupIds, setSelectedCustomerGroupIds] = useState([]);
   const [selectedRegionIds, setSelectedRegionIds] = useState([]);
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
-  const { data: customerGroups } = useQuery({
-    queryKey: ["customer-groups-variant-promotions"],
-    queryFn: async () => {
-      const res = await fetch("/admin/customer-groups?limit=50", {
-        headers: { "Content-Type": "application/json" },
-        credentials: "include"
-      });
-      if (!res.ok) return [];
-      const json = await res.json();
-      return json.customer_groups ?? [];
-    }
-  });
+  const [submitting, setSubmitting] = useState(false);
+  const [serverError, setServerError] = useState(null);
   const { data: regions } = useQuery({
-    queryKey: ["regions-variant-promotions"],
+    queryKey: ["regions-for-promotions"],
     queryFn: async () => {
-      const res = await fetch("/admin/regions?limit=50", {
+      const res = await fetch("/admin/regions", {
         headers: { "Content-Type": "application/json" },
         credentials: "include"
       });
@@ -496,66 +534,91 @@ function CreateVariantPromotionPage() {
       return json.regions ?? [];
     }
   });
-  const [submitting, setSubmitting] = useState(false);
-  const [serverError, setServerError] = useState(null);
-  const toggleCustomerGroup = (id) => {
-    setSelectedCustomerGroupIds(
-      (prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  };
-  const toggleRegion = (id) => {
-    setSelectedRegionIds((prev) => {
-      const next = prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id];
-      if (next.length > 0 && regions) {
-        const firstSelectedRegion = regions.find((r) => r.id === next[0]);
-        if (firstSelectedRegion) {
-          setCurrencyCode(firstSelectedRegion.currency_code.toLowerCase());
-        }
-      }
-      return next;
-    });
-  };
+  const { data: customerGroups } = useQuery({
+    queryKey: ["customer-groups-for-promotions"],
+    queryFn: async () => {
+      const res = await fetch("/admin/customer-groups", {
+        headers: { "Content-Type": "application/json" },
+        credentials: "include"
+      });
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.customer_groups ?? [];
+    }
+  });
+  const isBuyGet = type === "buy_x_get_y";
+  const canProceedFromType = code.trim().length >= 3;
   const canProceedFromVariants = variantIds.length > 0 && (!isBuyGet || buyVariantIds.length > 0);
-  const canProceedFromValue = code.trim().length >= 3 && value > 0 && (!isBuyGet || buyMinQuantity > 0);
+  const canProceedFromValue = value > 0 && (discountKind !== "percentage" || value <= 100);
   const goNext = () => {
-    setServerError(null);
-    if (step === "type") setStep("variants");
-    else if (step === "variants") setStep("value");
-    else if (step === "value") setStep("review");
+    if (step === "type" && canProceedFromType) setStep("variants");
+    else if (step === "variants" && canProceedFromVariants) setStep("value");
+    else if (step === "value" && canProceedFromValue) setStep("review");
   };
   const goBack = () => {
-    setServerError(null);
     if (step === "review") setStep("value");
     else if (step === "value") setStep("variants");
     else if (step === "variants") setStep("type");
   };
+  const toggleCustomerGroup = (groupId) => {
+    if (selectedCustomerGroupIds.includes(groupId)) {
+      setSelectedCustomerGroupIds(
+        selectedCustomerGroupIds.filter((id) => id !== groupId)
+      );
+    } else {
+      setSelectedCustomerGroupIds([...selectedCustomerGroupIds, groupId]);
+    }
+  };
+  const toggleRegion = (regionId) => {
+    if (selectedRegionIds.includes(regionId)) {
+      setSelectedRegionIds(selectedRegionIds.filter((id) => id !== regionId));
+    } else {
+      setSelectedRegionIds([...selectedRegionIds, regionId]);
+      const reg = regions == null ? void 0 : regions.find((r) => r.id === regionId);
+      if (reg == null ? void 0 : reg.currency_code) {
+        setCurrencyCode(reg.currency_code.toLowerCase());
+      }
+    }
+  };
   const handleSubmit = async () => {
+    var _a, _b;
     setSubmitting(true);
     setServerError(null);
-    const payload = {
-      code: code.trim(),
-      type: promoType,
-      method,
-      is_automatic: isAutomatic,
-      status,
-      discount_kind: discountKind,
-      value: Number(value),
-      currency_code: currencyCode.toLowerCase(),
-      allocation,
-      max_quantity: maxQuantity ? Number(maxQuantity) : void 0,
-      is_tax_inclusive: isTaxInclusive,
-      usage_limit: usageLimit ? Number(usageLimit) : void 0,
-      variant_ids: variantIds,
-      customer_group_ids: selectedCustomerGroupIds.length > 0 ? selectedCustomerGroupIds : void 0,
-      region_ids: selectedRegionIds.length > 0 ? selectedRegionIds : void 0,
-      starts_at: startsAt ? new Date(startsAt).toISOString() : void 0,
-      ends_at: endsAt ? new Date(endsAt).toISOString() : void 0
-    };
-    if (isBuyGet) {
-      payload.buy_variant_ids = buyVariantIds;
-      payload.buy_min_quantity = Number(buyMinQuantity);
-    }
     try {
+      const payload = {
+        code: code.trim().toUpperCase(),
+        description: description.trim() || void 0,
+        type,
+        currency_code: currencyCode,
+        discount_kind: discountKind,
+        value,
+        allocation,
+        max_quantity: maxQuantity,
+        status,
+        is_automatic: isAutomatic,
+        is_tax_inclusive: isTaxInclusive,
+        variant_ids: variantIds
+      };
+      if (usageLimit) {
+        payload.usage_limit = Number(usageLimit);
+      }
+      if (selectedCustomerGroupIds.length > 0) {
+        payload.customer_group_ids = selectedCustomerGroupIds;
+      }
+      if (selectedRegionIds.length > 0) {
+        payload.region_ids = selectedRegionIds;
+      }
+      if (startsAt) {
+        payload.starts_at = new Date(startsAt).toISOString();
+      }
+      if (endsAt) {
+        payload.ends_at = new Date(endsAt).toISOString();
+      }
+      if (isBuyGet) {
+        payload.buy_variant_ids = buyVariantIds;
+        payload.buy_min_quantity = buyMinQuantity;
+        payload.apply_to_quantity = applyToQuantity;
+      }
       const res = await fetch("/admin/variant-promotions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -564,132 +627,161 @@ function CreateVariantPromotionPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.message ?? "Failed to create promotion");
+        setServerError(
+          json.message ?? "Something went wrong creating the promotion."
+        );
+        setSubmitting(false);
+        return;
       }
-      toast.success("Variant Promotion Created", {
-        description: `Code ${code.toUpperCase()} successfully created!`
+      const createdCode = ((_a = json == null ? void 0 : json.promotion) == null ? void 0 : _a.code) ?? (Array.isArray(json == null ? void 0 : json.promotion) ? (_b = json.promotion[0]) == null ? void 0 : _b.code : void 0) ?? code.trim().toUpperCase();
+      toast.success(`Promotion "${createdCode}" created`, {
+        description: `Applies to ${(json == null ? void 0 : json.variant_count) ?? variantIds.length} variant(s).`
       });
-      nav("/variant-promotions");
+      navigate("/variant-promotions");
     } catch (err) {
-      setServerError(err.message ?? "Error creating promotion");
-      toast.error("Error", { description: err.message });
-    } finally {
+      setServerError((err == null ? void 0 : err.message) ?? "Network error — please try again.");
       setSubmitting(false);
     }
   };
-  return /* @__PURE__ */ jsxs(Container, { className: "p-0 divide-y", children: [
-    /* @__PURE__ */ jsxs("div", { className: "px-6 py-4 flex items-center justify-between", children: [
+  return /* @__PURE__ */ jsxs(Container, { className: "p-0", children: [
+    /* @__PURE__ */ jsxs("div", { className: "px-6 py-4 border-b flex items-center justify-between", children: [
       /* @__PURE__ */ jsxs("div", { children: [
         /* @__PURE__ */ jsx(Heading, { level: "h1", className: "text-xl font-semibold", children: "Create Variant Promotion" }),
-        /* @__PURE__ */ jsxs(Text, { size: "small", className: "text-ui-fg-subtle", children: [
-          "Step ",
-          step === "type" ? "1" : step === "variants" ? "2" : step === "value" ? "3" : "4",
-          " of 4"
-        ] })
+        /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle", children: "Target hand-picked product variants across any products in your store." })
       ] }),
       /* @__PURE__ */ jsx(StepIndicator, { current: step })
     ] }),
-    step === "type" && /* @__PURE__ */ jsxs("div", { className: "px-6 py-6 flex flex-col gap-y-4 max-w-lg", children: [
-      /* @__PURE__ */ jsx(Text, { className: "font-medium text-sm", children: "Select Promotion Type" }),
-      /* @__PURE__ */ jsxs(
-        "div",
-        {
-          onClick: () => setPromoType("percentage_off_product"),
-          className: [
-            "p-4 border rounded-lg cursor-pointer flex flex-col gap-y-1 transition-colors",
-            promoType === "percentage_off_product" ? "border-ui-border-interactive bg-ui-bg-subtle" : "hover:bg-ui-bg-subtle-hover"
-          ].join(" "),
-          children: [
-            /* @__PURE__ */ jsx(Text, { weight: "plus", size: "small", children: "Discount Specific Variants" }),
-            /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle", children: "Apply a percentage or fixed amount discount to hand-picked product variants." })
-          ]
-        }
-      ),
-      /* @__PURE__ */ jsxs(
-        "div",
-        {
-          onClick: () => setPromoType("buy_x_get_y"),
-          className: [
-            "p-4 border rounded-lg cursor-pointer flex flex-col gap-y-1 transition-colors",
-            promoType === "buy_x_get_y" ? "border-ui-border-interactive bg-ui-bg-subtle" : "hover:bg-ui-bg-subtle-hover"
-          ].join(" "),
-          children: [
-            /* @__PURE__ */ jsx(Text, { weight: "plus", size: "small", children: "Buy X Get Y (Variant Level)" }),
-            /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle", children: "Customer buys specific trigger variants to get selected target variants at a discount." })
-          ]
-        }
-      )
-    ] }),
-    step === "variants" && /* @__PURE__ */ jsxs("div", { className: "px-6 py-6 flex flex-col gap-y-6 max-w-xl", children: [
-      isBuyGet && /* @__PURE__ */ jsx(
-        VariantPicker,
-        {
-          label: "1. Select 'Buy' Trigger Variants (What customer buys)",
-          selected: buyVariantIds,
-          onChange: setBuyVariantIds
-        }
-      ),
-      /* @__PURE__ */ jsx(
-        VariantPicker,
-        {
-          label: isBuyGet ? "2. Select 'Get' Target Variants (What customer receives at discount)" : "Select Target Variants to Discount",
-          selected: variantIds,
-          onChange: setVariantIds
-        }
-      )
-    ] }),
-    step === "value" && /* @__PURE__ */ jsxs("div", { className: "px-6 py-6 flex flex-col gap-y-6 max-w-xl", children: [
-      /* @__PURE__ */ jsxs("div", { className: "flex gap-x-4", children: [
-        /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 flex-1", children: [
-          /* @__PURE__ */ jsx(Label, { htmlFor: "method", children: "Method" }),
-          /* @__PURE__ */ jsxs(Select, { value: method, onValueChange: (v) => setMethod(v), children: [
-            /* @__PURE__ */ jsx(Select.Trigger, { id: "method", children: /* @__PURE__ */ jsx(Select.Value, {}) }),
-            /* @__PURE__ */ jsxs(Select.Content, { children: [
-              /* @__PURE__ */ jsx(Select.Item, { value: "code", children: "Promotion Code" }),
-              /* @__PURE__ */ jsx(Select.Item, { value: "automatic", children: "Automatic" })
-            ] })
-          ] })
-        ] }),
-        /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 flex-1", children: [
-          /* @__PURE__ */ jsx(Label, { htmlFor: "status", children: "Status" }),
-          /* @__PURE__ */ jsxs(Select, { value: status, onValueChange: (v) => setStatus(v), children: [
-            /* @__PURE__ */ jsx(Select.Trigger, { id: "status", children: /* @__PURE__ */ jsx(Select.Value, {}) }),
-            /* @__PURE__ */ jsxs(Select.Content, { children: [
-              /* @__PURE__ */ jsx(Select.Item, { value: "active", children: "Active" }),
-              /* @__PURE__ */ jsx(Select.Item, { value: "draft", children: "Draft" })
-            ] })
+    step === "type" && /* @__PURE__ */ jsxs("div", { className: "px-6 py-6 flex flex-col gap-y-6 max-w-lg", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2", children: [
+        /* @__PURE__ */ jsx(Label, { children: "Method" }),
+        /* @__PURE__ */ jsxs("div", { className: "flex gap-x-4", children: [
+          /* @__PURE__ */ jsxs("label", { className: "flex items-center gap-x-2 cursor-pointer", children: [
+            /* @__PURE__ */ jsx(
+              "input",
+              {
+                type: "radio",
+                name: "isAutomatic",
+                checked: !isAutomatic,
+                onChange: () => setIsAutomatic(false)
+              }
+            ),
+            /* @__PURE__ */ jsx(Text, { size: "small", children: "Promotion Code" })
+          ] }),
+          /* @__PURE__ */ jsxs("label", { className: "flex items-center gap-x-2 cursor-pointer", children: [
+            /* @__PURE__ */ jsx(
+              "input",
+              {
+                type: "radio",
+                name: "isAutomatic",
+                checked: isAutomatic,
+                onChange: () => setIsAutomatic(true)
+              }
+            ),
+            /* @__PURE__ */ jsx(Text, { size: "small", children: "Automatic (Applied at checkout)" })
           ] })
         ] })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2", children: [
-        /* @__PURE__ */ jsx(Label, { htmlFor: "code", children: "Promotion Code *" }),
+        /* @__PURE__ */ jsx(Label, { htmlFor: "promo_code", children: "Promotion Code" }),
         /* @__PURE__ */ jsx(
           Input,
           {
-            id: "code",
-            placeholder: "e.g. VARIANT20",
+            id: "promo_code",
+            placeholder: "e.g. CONE100",
             value: code,
             onChange: (e) => setCode(e.target.value.toUpperCase())
           }
         )
       ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between border rounded-md p-3", children: [
+        /* @__PURE__ */ jsxs("div", { children: [
+          /* @__PURE__ */ jsx(Text, { weight: "plus", size: "small", children: "Status" }),
+          /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle", children: "Active promotions apply immediately. Drafts require manual activation." })
+        ] }),
+        /* @__PURE__ */ jsx(
+          Switch,
+          {
+            checked: status === "active",
+            onCheckedChange: (c) => setStatus(c ? "active" : "draft")
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2", children: [
+        /* @__PURE__ */ jsx(Label, { children: "Promotion Type" }),
+        /* @__PURE__ */ jsxs(
+          RadioGroup,
+          {
+            value: type,
+            onValueChange: (val) => setType(val),
+            children: [
+              /* @__PURE__ */ jsxs("div", { className: "flex items-start gap-x-3 border rounded-md p-3 cursor-pointer", children: [
+                /* @__PURE__ */ jsx(RadioGroup.Item, { value: "percentage_off_product", id: "opt_perc" }),
+                /* @__PURE__ */ jsxs("label", { htmlFor: "opt_perc", className: "cursor-pointer", children: [
+                  /* @__PURE__ */ jsx(Text, { weight: "plus", size: "small", children: "Discount on specific variants" }),
+                  /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle", children: "Apply percentage or fixed amount off selected variants." })
+                ] })
+              ] }),
+              /* @__PURE__ */ jsxs("div", { className: "flex items-start gap-x-3 border rounded-md p-3 cursor-pointer mt-2", children: [
+                /* @__PURE__ */ jsx(RadioGroup.Item, { value: "buy_x_get_y", id: "opt_bgy" }),
+                /* @__PURE__ */ jsxs("label", { htmlFor: "opt_bgy", className: "cursor-pointer", children: [
+                  /* @__PURE__ */ jsx(Text, { weight: "plus", size: "small", children: "Buy X, Get Y (Free gift / conditional)" }),
+                  /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle", children: "Customer buys X variant(s) and gets discount on Y variant(s)." })
+                ] })
+              ] })
+            ]
+          }
+        )
+      ] })
+    ] }),
+    step === "variants" && /* @__PURE__ */ jsxs("div", { className: "px-6 py-6 flex flex-col gap-y-6 max-w-2xl", children: [
+      isBuyGet && /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 border-b pb-6", children: [
+        /* @__PURE__ */ jsx(Label, { className: "text-base font-semibold", children: "Step A: Buy Condition (Trigger Variants)" }),
+        /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle", children: "Select the variants customer must have in cart to unlock the promo." }),
+        /* @__PURE__ */ jsx(
+          VariantPicker,
+          {
+            selected: buyVariantIds,
+            onChange: setBuyVariantIds
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2", children: [
+        /* @__PURE__ */ jsx(Label, { className: "text-base font-semibold", children: isBuyGet ? "Step B: Discounted Items (Get Variants)" : "Target Product Variants" }),
+        /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle", children: "Select the specific variants that receive the discount." }),
+        /* @__PURE__ */ jsx(
+          VariantPicker,
+          {
+            selected: variantIds,
+            onChange: setVariantIds
+          }
+        )
+      ] })
+    ] }),
+    step === "value" && /* @__PURE__ */ jsxs("div", { className: "px-6 py-6 flex flex-col gap-y-6 max-w-lg", children: [
       /* @__PURE__ */ jsxs("div", { className: "flex gap-x-4", children: [
         /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 flex-1", children: [
-          /* @__PURE__ */ jsx(Label, { htmlFor: "kind", children: "Discount Type" }),
-          /* @__PURE__ */ jsxs(Select, { value: discountKind, onValueChange: (v) => setDiscountKind(v), children: [
-            /* @__PURE__ */ jsx(Select.Trigger, { id: "kind", children: /* @__PURE__ */ jsx(Select.Value, {}) }),
-            /* @__PURE__ */ jsxs(Select.Content, { children: [
-              /* @__PURE__ */ jsx(Select.Item, { value: "percentage", children: "Percentage (%)" }),
-              /* @__PURE__ */ jsx(Select.Item, { value: "fixed", children: "Fixed Amount" })
-            ] })
-          ] })
+          /* @__PURE__ */ jsx(Label, { children: "Discount Type" }),
+          /* @__PURE__ */ jsxs(
+            Select,
+            {
+              value: discountKind,
+              onValueChange: (v) => setDiscountKind(v),
+              children: [
+                /* @__PURE__ */ jsx(Select.Trigger, { children: /* @__PURE__ */ jsx(Select.Value, {}) }),
+                /* @__PURE__ */ jsxs(Select.Content, { children: [
+                  /* @__PURE__ */ jsx(Select.Item, { value: "percentage", children: "Percentage (%)" }),
+                  /* @__PURE__ */ jsx(Select.Item, { value: "fixed", children: "Fixed Amount" })
+                ] })
+              ]
+            }
+          )
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 flex-1", children: [
-          /* @__PURE__ */ jsx(Label, { htmlFor: "value", children: discountKind === "percentage" ? "Percentage Off (%)" : `Amount Off (${currencyCode.toUpperCase()})` }),
+          /* @__PURE__ */ jsx(Label, { htmlFor: "val", children: "Value" }),
           /* @__PURE__ */ jsx(
             Input,
             {
-              id: "value",
+              id: "val",
               type: "number",
               min: 1,
               max: discountKind === "percentage" ? 100 : void 0,
@@ -701,53 +793,72 @@ function CreateVariantPromotionPage() {
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "flex gap-x-4", children: [
         /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 flex-1", children: [
-          /* @__PURE__ */ jsx(Label, { htmlFor: "allocation", children: "Allocation" }),
-          /* @__PURE__ */ jsxs(Select, { value: allocation, onValueChange: (v) => setAllocation(v), children: [
-            /* @__PURE__ */ jsx(Select.Trigger, { id: "allocation", children: /* @__PURE__ */ jsx(Select.Value, {}) }),
-            /* @__PURE__ */ jsxs(Select.Content, { children: [
-              /* @__PURE__ */ jsx(Select.Item, { value: "each", children: "Apply to each item" }),
-              /* @__PURE__ */ jsx(Select.Item, { value: "across", children: "Split across items" }),
-              /* @__PURE__ */ jsx(Select.Item, { value: "once", children: "Apply once per cart" })
-            ] })
-          ] })
+          /* @__PURE__ */ jsx(Label, { children: "Allocation" }),
+          /* @__PURE__ */ jsxs(
+            Select,
+            {
+              value: allocation,
+              onValueChange: (v) => {
+                const alloc = v;
+                setAllocation(alloc);
+                if (alloc === "once") {
+                  setMaxQuantity(1);
+                }
+              },
+              children: [
+                /* @__PURE__ */ jsx(Select.Trigger, { children: /* @__PURE__ */ jsx(Select.Value, {}) }),
+                /* @__PURE__ */ jsxs(Select.Content, { children: [
+                  /* @__PURE__ */ jsx(Select.Item, { value: "each", children: "Each item" }),
+                  /* @__PURE__ */ jsx(Select.Item, { value: "across", children: "Across items" }),
+                  /* @__PURE__ */ jsx(Select.Item, { value: "once", children: "Once per cart" })
+                ] })
+              ]
+            }
+          )
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 flex-1", children: [
-          /* @__PURE__ */ jsx(Label, { htmlFor: "max_quantity", children: "Max Quantity per Cart" }),
+          /* @__PURE__ */ jsx(Label, { htmlFor: "max_qty", children: "Max quantity per cart" }),
           /* @__PURE__ */ jsx(
             Input,
             {
-              id: "max_quantity",
+              id: "max_qty",
               type: "number",
               min: 1,
-              value: maxQuantity,
+              disabled: allocation === "once",
+              value: allocation === "once" ? 1 : maxQuantity,
               onChange: (e) => setMaxQuantity(Number(e.target.value))
+            }
+          ),
+          allocation === "once" && /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle text-xs", children: "Locked to 1 unit per cart when allocated once." })
+        ] })
+      ] }),
+      isBuyGet && /* @__PURE__ */ jsxs("div", { className: "flex gap-x-4 border-t pt-4", children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 flex-1", children: [
+          /* @__PURE__ */ jsx(Label, { htmlFor: "buy_min_qty", children: "Min. quantity to buy" }),
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              id: "buy_min_qty",
+              type: "number",
+              min: 1,
+              value: buyMinQuantity,
+              onChange: (e) => setBuyMinQuantity(Number(e.target.value))
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 flex-1", children: [
+          /* @__PURE__ */ jsx(Label, { htmlFor: "apply_qty", children: "Quantity discounted" }),
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              id: "apply_qty",
+              type: "number",
+              min: 1,
+              value: applyToQuantity,
+              onChange: (e) => setApplyToQuantity(Number(e.target.value))
             }
           )
         ] })
-      ] }),
-      /* @__PURE__ */ jsx("div", { className: "flex flex-col gap-y-2 border-t pt-4", children: /* @__PURE__ */ jsxs("label", { className: "flex items-center gap-x-2 cursor-pointer text-sm font-medium", children: [
-        /* @__PURE__ */ jsx(
-          Checkbox,
-          {
-            checked: isTaxInclusive,
-            onCheckedChange: (checked) => setIsTaxInclusive(Boolean(checked))
-          }
-        ),
-        /* @__PURE__ */ jsx("span", { children: "Tax Inclusive (Price includes tax)" })
-      ] }) }),
-      /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 border-t pt-4", children: [
-        /* @__PURE__ */ jsx(Label, { htmlFor: "usage_limit", children: "Global Usage Limit (Optional)" }),
-        /* @__PURE__ */ jsx(
-          Input,
-          {
-            id: "usage_limit",
-            type: "number",
-            min: 1,
-            placeholder: "e.g. 50 (Leave blank for unlimited)",
-            value: usageLimit ?? "",
-            onChange: (e) => setUsageLimit(e.target.value ? Number(e.target.value) : void 0)
-          }
-        )
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 border-t pt-4", children: [
         /* @__PURE__ */ jsx(Label, { children: "Target Regions" }),
@@ -770,6 +881,7 @@ function CreateVariantPromotionPage() {
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 border-t pt-4", children: [
         /* @__PURE__ */ jsx(Label, { children: "Who can use this code? (Customer Groups)" }),
+        /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle mb-2", children: "Leave unselected to allow all customers, or check specific groups." }),
         customerGroups && customerGroups.length > 0 ? /* @__PURE__ */ jsx("div", { className: "flex flex-col gap-y-2 max-h-36 overflow-y-auto border rounded-md p-3", children: customerGroups.map((group) => /* @__PURE__ */ jsxs("label", { className: "flex items-center gap-x-2 cursor-pointer text-sm", children: [
           /* @__PURE__ */ jsx(
             Checkbox,
@@ -780,6 +892,35 @@ function CreateVariantPromotionPage() {
           ),
           /* @__PURE__ */ jsx("span", { children: group.name })
         ] }, group.id)) }) : /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle italic", children: "No customer groups configured — applies to all customers." })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 border-t pt-4", children: [
+        /* @__PURE__ */ jsx(Label, { children: "Schedule (Optional)" }),
+        /* @__PURE__ */ jsxs("div", { className: "flex gap-x-4", children: [
+          /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 flex-1", children: [
+            /* @__PURE__ */ jsx(Label, { htmlFor: "starts_at", className: "text-xs text-ui-fg-subtle", children: "Start Date & Time" }),
+            /* @__PURE__ */ jsx(
+              Input,
+              {
+                id: "starts_at",
+                type: "datetime-local",
+                value: startsAt,
+                onChange: (e) => setStartsAt(e.target.value)
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 flex-1", children: [
+            /* @__PURE__ */ jsx(Label, { htmlFor: "ends_at", className: "text-xs text-ui-fg-subtle", children: "End Date & Time" }),
+            /* @__PURE__ */ jsx(
+              Input,
+              {
+                id: "ends_at",
+                type: "datetime-local",
+                value: endsAt,
+                onChange: (e) => setEndsAt(e.target.value)
+              }
+            )
+          ] })
+        ] })
       ] })
     ] }),
     step === "review" && /* @__PURE__ */ jsxs("div", { className: "px-6 py-6 flex flex-col gap-y-4 max-w-lg", children: [
@@ -803,6 +944,13 @@ function CreateVariantPromotionPage() {
       /* @__PURE__ */ jsx(ReviewRow, { label: "Max quantity", value: String(maxQuantity) }),
       /* @__PURE__ */ jsx(ReviewRow, { label: "Includes taxes", value: isTaxInclusive ? "Yes" : "No" }),
       usageLimit && /* @__PURE__ */ jsx(ReviewRow, { label: "Global usage limit", value: `${usageLimit} orders` }),
+      isBuyGet && /* @__PURE__ */ jsx(
+        ReviewRow,
+        {
+          label: "Buy condition",
+          value: `Buy ${buyMinQuantity}+ of ${buyVariantIds.length} variant(s)`
+        }
+      ),
       /* @__PURE__ */ jsx(
         ReviewRow,
         {
@@ -817,6 +965,20 @@ function CreateVariantPromotionPage() {
           value: selectedRegionIds.length > 0 ? `${selectedRegionIds.length} region(s)` : "All regions"
         }
       ),
+      /* @__PURE__ */ jsx(
+        ReviewRow,
+        {
+          label: "Who can use",
+          value: selectedCustomerGroupIds.length > 0 ? `${selectedCustomerGroupIds.length} customer group(s)` : "All customers"
+        }
+      ),
+      (startsAt || endsAt) && /* @__PURE__ */ jsx(
+        ReviewRow,
+        {
+          label: "Schedule",
+          value: `${startsAt ? `Starts ${startsAt}` : "Starts immediately"}${endsAt ? ` · Ends ${endsAt}` : ""}`
+        }
+      ),
       serverError && /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-error", children: serverError })
     ] }),
     /* @__PURE__ */ jsxs("div", { className: "px-6 py-4 flex items-center justify-between", children: [
@@ -824,7 +986,7 @@ function CreateVariantPromotionPage() {
         Button,
         {
           variant: "secondary",
-          onClick: step === "type" ? () => nav("/variant-promotions") : goBack,
+          onClick: step === "type" ? () => navigate("/variant-promotions") : goBack,
           disabled: submitting,
           children: step === "type" ? "Cancel" : "Back"
         }
@@ -833,7 +995,7 @@ function CreateVariantPromotionPage() {
         Button,
         {
           onClick: goNext,
-          disabled: step === "variants" && !canProceedFromVariants || step === "value" && !canProceedFromValue,
+          disabled: step === "type" && !canProceedFromType || step === "variants" && !canProceedFromVariants || step === "value" && !canProceedFromValue,
           children: "Continue"
         }
       ) : /* @__PURE__ */ jsx(Button, { onClick: handleSubmit, isLoading: submitting, children: "Create promotion" })
@@ -863,6 +1025,10 @@ const config = defineRouteConfig({
   label: "Create Variant Promotion"
 });
 const widgetModule = { widgets: [
+  {
+    Component: PromotionListCtaWidget,
+    zone: ["promotion.list.after"]
+  },
   {
     Component: PromotionVariantDetailWidget,
     zone: ["promotion.details.after"]
