@@ -53,8 +53,8 @@ const buildPromotionPayloadStep = createStep(
     }
 
     const alloc = input.allocation ?? "each"
-    // When allocation is "once", enforce max_quantity: 1 so only 1 unit is discounted per cart
-    const effectiveMaxQty = alloc === "once" ? 1 : (input.max_quantity ?? 100)
+    // Default max_quantity to 1 when allocation is "once", but allow custom max_quantity overrides
+    const effectiveMaxQty = input.max_quantity ?? (alloc === "once" ? 1 : 100)
 
     const applicationMethod: Record<string, unknown> = {
       type: input.discount_kind,

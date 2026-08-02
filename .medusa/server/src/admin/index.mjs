@@ -824,13 +824,27 @@ function CreateVariantPromotionPage() {
               id: "max_qty",
               type: "number",
               min: 1,
-              disabled: allocation === "once",
-              value: allocation === "once" ? 1 : maxQuantity,
+              value: maxQuantity,
               onChange: (e) => setMaxQuantity(Number(e.target.value))
             }
           ),
-          allocation === "once" && /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle text-xs", children: "Locked to 1 unit per cart when allocated once." })
+          /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle text-xs", children: allocation === "once" ? "Defaults to 1 unit per cart (editable)." : "Maximum units per cart that can receive the discount." })
         ] })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 border-t pt-4", children: [
+        /* @__PURE__ */ jsx(Label, { htmlFor: "usage_limit", children: "Global Usage Limit (Storewide Order Limit)" }),
+        /* @__PURE__ */ jsx(
+          Input,
+          {
+            id: "usage_limit",
+            type: "number",
+            min: 1,
+            placeholder: "e.g. 100 (Leave empty for unlimited storewide uses)",
+            value: usageLimit,
+            onChange: (e) => setUsageLimit(e.target.value)
+          }
+        ),
+        /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle text-xs", children: "Total number of times this promo can be redeemed storewide across all customers (optional)." })
       ] }),
       isBuyGet && /* @__PURE__ */ jsxs("div", { className: "flex gap-x-4 border-t pt-4", children: [
         /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-y-2 flex-1", children: [

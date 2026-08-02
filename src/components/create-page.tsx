@@ -406,16 +406,30 @@ export function CreateVariantPromotionPage() {
                 id="max_qty"
                 type="number"
                 min={1}
-                disabled={allocation === "once"}
-                value={allocation === "once" ? 1 : maxQuantity}
+                value={maxQuantity}
                 onChange={(e) => setMaxQuantity(Number(e.target.value))}
               />
-              {allocation === "once" && (
-                <Text size="small" className="text-ui-fg-subtle text-xs">
-                  Locked to 1 unit per cart when allocated once.
-                </Text>
-              )}
+              <Text size="small" className="text-ui-fg-subtle text-xs">
+                {allocation === "once"
+                  ? "Defaults to 1 unit per cart (editable)."
+                  : "Maximum units per cart that can receive the discount."}
+              </Text>
             </div>
+          </div>
+
+          <div className="flex flex-col gap-y-2 border-t pt-4">
+            <Label htmlFor="usage_limit">Global Usage Limit (Storewide Order Limit)</Label>
+            <Input
+              id="usage_limit"
+              type="number"
+              min={1}
+              placeholder="e.g. 100 (Leave empty for unlimited storewide uses)"
+              value={usageLimit}
+              onChange={(e) => setUsageLimit(e.target.value)}
+            />
+            <Text size="small" className="text-ui-fg-subtle text-xs">
+              Total number of times this promo can be redeemed storewide across all customers (optional).
+            </Text>
           </div>
 
           {isBuyGet && (

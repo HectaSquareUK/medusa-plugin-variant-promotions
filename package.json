@@ -1,6 +1,6 @@
 {
   "name": "@hectasquare/medusa-plugin-variant-promotions",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "Medusa v2 plugin adding full support for variant-level promotions with native search, automatic subscriber, and Admin UI creation wizard.",
   "main": ".medusa/server/index.js",
   "module": ".medusa/server/index.js",
